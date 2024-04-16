@@ -1,5 +1,6 @@
 using inotebookApi.Data;
 using inotebookApi.Helpers.Utils;
+using inotebookApi.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -63,12 +64,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthorization();
-
 app.MapControllers();
 
 // Use CORS policy
 app.UseCors("AllowReactApp");
+
+// Add JwtMiddleware to the request processing pipeline
+app.UseMiddleware<JwtMiddleware>();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

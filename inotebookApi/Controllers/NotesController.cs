@@ -1,9 +1,11 @@
 ﻿using inotebookApi.Data;
+using inotebookApi.Helpers.Utils;
 using inotebookApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using inotebookApi.Helpers.Utils;
 
 namespace inotebookApi.Controllers
 {
@@ -12,10 +14,12 @@ namespace inotebookApi.Controllers
     public class NotesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly JwtUtils _jwtUtils;
 
-        public NotesController(ApplicationDbContext context)
+        public NotesController(ApplicationDbContext context,JwtUtils jwtutils)
         {
             _context = context;
+            _jwtUtils = jwtutils;
         }
 
 
@@ -23,41 +27,93 @@ namespace inotebookApi.Controllers
         public async Task<IActionResult> GetNotes()
         {
             // Get the authenticated user's ID from the claims and convert it to an integer
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
 
 
-            if (userId == null)
+            // Get the JWT token from the request headers
+            var token = HttpContext.Request.Headers["auth_token"].FirstOrDefault()?.Split(" ").Last();
+
+            //var userId = 10;
+
+            // Check if the token is missing or invalid
+            if (token == null)
             {
-                //return Unauthorized();
-                return StatusCode(500, new { success = false, error = "Not Authorised" });
+                return StatusCode(500, new { success = false, error = "Authorization token missing" });
             }
 
-            // Fetch notes for the authenticated user
-            var notes = await _context.Notes
-                .Where(n => n.UserId == userId)
-                .ToListAsync();
+            try
+            {
+                // Validate and decode the JWT token
+                var claimsPrincipal = _jwtUtils.ValidateJwtToken(token); // Implement this method to validate and decode the JWT token
 
-            //return Ok(notes);
-            return Ok(new { success = true, notes = notes });
+                // Extract the user's ID from the claims
+                var userIdClaim = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return StatusCode(500, new { success = false, error = "Invalid or missing user ID claim" });
+                }
+
+                // Fetch notes for the authenticated user
+                var notes = await _context.Notes
+                    .Where(n => n.UserId == userId)
+                    .ToListAsync();
+
+                return Ok(new { success = true, notes = notes });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, error = ex.Message });
+            }
         }
 
         [HttpPost("CreateNote")]
-        //[Authorize] // Ensure only authenticated users can create notes
-        public async Task<IActionResult> CreateNote(Note note)
+        public async Task<IActionResult> CreateNote([FromBody] CreateNoteRequest request)
         {
-            if (!ModelState.IsValid)
+
+            // Get the JWT token from the request headers
+            var token = HttpContext.Request.Headers["auth_token"].FirstOrDefault()?.Split(" ").Last();
+
+            //var userId = 10;
+
+            // Check if the token is missing or invalid
+            if (token == null)
             {
-                return BadRequest(ModelState);
+                return StatusCode(500, new { success = false, error = "Authorization token missing" });
             }
 
-            // Assign the current user's ID to the note
-            note.UserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            try
+            {
+                // Validate and decode the JWT token
+                var claimsPrincipal = _jwtUtils.ValidateJwtToken(token); // Implement this method to validate and decode the JWT token
 
+                // Extract the user's ID from the claims
+                var userIdClaim = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return StatusCode(500, new { success = false, error = "Invalid or missing user ID claim" });
+                }
+                // Create a new Note entity from the request data
+                var note = new Note
+            {
+                title = request.Title,
+                description = request.Description,
+                tag = request.Tag,
+                // Assign the user ID based on the authenticated user
+                UserId = userId
+            };
+
+            // Add the note to the database
             _context.Notes.Add(note);
             await _context.SaveChangesAsync();
 
+            // Return a 201 Created response with the created note
             return CreatedAtAction(nameof(GetNotes), new { id = note._id }, note);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, error = ex.Message });
+            }
         }
+
 
         [HttpPut("UpdateNote/{id}")]
         //[Authorize] // Ensure only authenticated users can update notes

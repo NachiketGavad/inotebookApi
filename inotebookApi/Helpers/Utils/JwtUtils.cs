@@ -36,5 +36,42 @@ namespace inotebookApi.Helpers.Utils
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
         }
+        public ClaimsPrincipal ValidateJwtToken(string token)
+        {
+            // Read the secret key from configuration
+            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]);
+
+            // Configure token validation parameters
+            var tokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                // Additional validation parameters can be configured as needed
+            };
+
+            // Create a token handler
+            var tokenHandler = new JwtSecurityTokenHandler();
+
+            try
+            {
+                // Validate and decode the JWT token
+                var claimsPrincipal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var validatedToken);
+
+                // Check if the token is a JWT token
+                if (!(validatedToken is JwtSecurityToken jwtSecurityToken))
+                {
+                    throw new SecurityTokenException("Invalid JWT token");
+                }
+
+                return claimsPrincipal;
+            }
+            catch (SecurityTokenException ex)
+            {
+                // Handle token validation errors
+                throw new SecurityTokenException("Token validation failed", ex);
+            }
+        }
     }
 }
