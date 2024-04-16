@@ -117,29 +117,45 @@ namespace inotebookApi.Controllers
 
         [HttpPut("UpdateNote/{id}")]
         //[Authorize] // Ensure only authenticated users can update notes
-        public async Task<IActionResult> UpdateNote(int id, Note note)
+        public async Task<IActionResult> UpdateNote(int id, [FromBody] CreateNoteRequest note)
         {
-            if (id != note._id)
-            {
-                return BadRequest();
-            }
+            // Get the JWT token from the request headers
+            var token = HttpContext.Request.Headers["auth_token"].FirstOrDefault()?.Split(" ").Last();
 
-            _context.Entry(note).State = EntityState.Modified;
+            //var userId = 10;
+
+            // Check if the token is missing or invalid
+            if (token == null)
+            {
+                return StatusCode(500, new { success = false, error = "Authorization token missing" });
+            }
 
             try
             {
+                // Validate and decode the JWT token
+                var claimsPrincipal = _jwtUtils.ValidateJwtToken(token); // Implement this method to validate and decode the JWT token
+
+                // Extract the user's ID from the claims
+                var userIdClaim = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return StatusCode(500, new { success = false, error = "Invalid or missing user ID claim" });
+                }
+
+                var note_exists = _context.Notes.Find(id);
+                if(note_exists == null)
+                {
+                    return StatusCode(500, new { success = false, error = "No note present" });
+                }
+                note_exists.title = note.Title;
+                note_exists.description = note.Description;
+                note_exists.tag = note.Tag;
                 await _context.SaveChangesAsync();
+                return Ok(new { success = true,message = "Note Edited Successfully" });
             }
-            catch (DbUpdateConcurrencyException)
+            catch (Exception ex)
             {
-                if (!NoteExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                return StatusCode(500, new { success = false, error = ex.Message });
             }
 
             return NoContent();
