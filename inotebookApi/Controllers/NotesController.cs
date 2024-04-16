@@ -39,8 +39,8 @@ namespace inotebookApi.Controllers
             return Ok(notes);
         }
 
-        //[Authorize]
         [HttpPost("CreateNote")]
+        [Authorize] // Ensure only authenticated users can create notes
         public async Task<IActionResult> CreateNote(Note note)
         {
             if (!ModelState.IsValid)
@@ -48,14 +48,17 @@ namespace inotebookApi.Controllers
                 return BadRequest(ModelState);
             }
 
+            // Assign the current user's ID to the note
+            note.UserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
             _context.Notes.Add(note);
             await _context.SaveChangesAsync();
 
-            return Ok(note);
+            return CreatedAtAction(nameof(GetNotes), new { id = note._id }, note);
         }
 
-        [Authorize]
         [HttpPut("UpdateNote/{id}")]
+        [Authorize] // Ensure only authenticated users can update notes
         public async Task<IActionResult> UpdateNote(int id, Note note)
         {
             if (id != note._id)
@@ -84,8 +87,8 @@ namespace inotebookApi.Controllers
             return NoContent();
         }
 
-        [Authorize]
         [HttpDelete("DeleteNote/{id}")]
+        [Authorize]
         public async Task<IActionResult> DeleteNote(int id)
         {
             var note = await _context.Notes.FindAsync(id);
