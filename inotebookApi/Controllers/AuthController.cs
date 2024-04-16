@@ -7,6 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Security.Cryptography;
+using inotebookApi.Helpers.Utils;
 
 namespace inotebookApi.Controllers
 {
@@ -17,12 +18,14 @@ namespace inotebookApi.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly IPasswordService _passwordService;
+        private readonly JwtUtils _jwtUtils;
 
-        public AuthController(ApplicationDbContext context, IConfiguration configuration, IPasswordService passwordService)
+        public AuthController(ApplicationDbContext context, IConfiguration configuration, IPasswordService passwordService, JwtUtils jwtUtils)
         {
             _context = context;
             _configuration = configuration;
             _passwordService = passwordService;
+            _jwtUtils = jwtUtils;
         }
 
         [HttpPost("CreateUser")]
@@ -48,11 +51,11 @@ namespace inotebookApi.Controllers
             await _context.SaveChangesAsync();
 
             // Generate JWT token
-            //var token = "abc";
-            var token = GenerateJwtToken(user);
+            var token = _jwtUtils.GenerateJwtToken(user);
 
             return Ok(new { success = true, auth_token = token });
         }
+
 
 
         [HttpPost("LoginUser")]
@@ -79,7 +82,7 @@ namespace inotebookApi.Controllers
                 }
 
                 // Generate JWT token
-                var token = GenerateJwtToken(user);//If login usrename and password are correct then proceed to generate token
+                var token = _jwtUtils.GenerateJwtToken(user);//If login usrename and password are correct then proceed to generate token
 
 
                 return Ok(new { success = true, auth_token = token });
@@ -106,20 +109,6 @@ namespace inotebookApi.Controllers
             }
 
             return Ok(user);
-        }
-        private string GenerateJwtToken(User user)
-        {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-            var Sectoken = new JwtSecurityToken(_configuration["Jwt:Issuer"],
-              _configuration["Jwt:Issuer"],
-              null,
-              expires: DateTime.Now.AddMinutes(120),
-              signingCredentials: credentials);
-
-            var token = new JwtSecurityTokenHandler().WriteToken(Sectoken);
-            return token;
         }
     }
 }

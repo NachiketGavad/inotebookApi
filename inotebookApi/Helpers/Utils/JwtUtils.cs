@@ -1,37 +1,40 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using inotebookApi.Models;
+using inotebookApi.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace inotebookApi.Helpers.Utils
 {
     public class JwtUtils
     {
         private readonly IConfiguration _configuration;
-        public JwtUtils(IConfiguration configuratin)
+        public JwtUtils(IConfiguration configuration)
         {
-            _configuration = configuratin;
+            _configuration = configuration;
         }
-        static string secret = "mysecretkey"; 
-        
-        public static bool ValidateJwtToken(string token)
+
+
+        public string GenerateJwtToken(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var validationParameters = new TokenValidationParameters
+            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]); // Secret key used for signing the token
+            var tokenDescriptor = new SecurityTokenDescriptor
             {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Convert.FromBase64String(_configuration["Jwt:Key"])),
-                ValidateIssuer = false,
-                ValidateAudience = false
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, user._id.ToString()),
+                    // Add other claims as needed, e.g., user email, name
+                }),
+                Expires = DateTime.UtcNow.AddHours(1), // Token expiration time
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
-
-            try
-            {
-                tokenHandler.ValidateToken(token, validationParameters, out _);
-                return true; // Token is valid
-            }
-            catch (Exception)
-            {
-                return false; // Token is invalid
-            }
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }

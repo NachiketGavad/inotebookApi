@@ -3,6 +3,7 @@ using inotebookApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace inotebookApi.Controllers
 {
@@ -17,15 +18,28 @@ namespace inotebookApi.Controllers
             _context = context;
         }
 
-        [Authorize]
+
         [HttpGet("GetNotes")]
         public async Task<IActionResult> GetNotes()
         {
-            var notes = await _context.Notes.ToListAsync();
+            // Get the authenticated user's ID from the claims and convert it to an integer
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+
+
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            // Fetch notes for the authenticated user
+            var notes = await _context.Notes
+                .Where(n => n.UserId == userId)
+                .ToListAsync();
+
             return Ok(notes);
         }
 
-        [Authorize]
+        //[Authorize]
         [HttpPost("CreateNote")]
         public async Task<IActionResult> CreateNote(Note note)
         {

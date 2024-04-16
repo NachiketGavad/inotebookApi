@@ -1,4 +1,5 @@
 using inotebookApi.Data;
+using inotebookApi.Helpers.Utils;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -27,6 +28,7 @@ builder.Services.AddCors(options =>
         });
 });
 
+builder.Services.AddSingleton<JwtUtils>();
 
 //Jwt configuration starts here
 var jwtIssuer = builder.Configuration.GetSection("Jwt:Issuer").Get<string>();

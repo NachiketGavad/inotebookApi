@@ -1,78 +1,61 @@
-﻿using inotebookApi.Helpers.Utils;
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using System.Threading.Tasks;
-using inotebookApi.Helpers.Responses;
-using inotebookApi.DTOs;
-
+using Microsoft.Extensions.Primitives;
+using inotebookApi.Helpers.Utils;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace inotebookApi.Middlewares
 {
-    // You may need to install the Microsoft.AspNetCore.Http.Abstractions package into your project
     public class JwtMiddleware
     {
-        private readonly RequestDelegate _next;
 
-        public JwtMiddleware(RequestDelegate next)
+        private readonly RequestDelegate _next;
+        private readonly IConfiguration _configuration;
+
+        public JwtMiddleware(RequestDelegate next, IConfiguration configuration)
         {
             _next = next;
+            _configuration = configuration;
         }
 
-        public Task Invoke(HttpContext httpContext)
+        public async Task Invoke(HttpContext context)
         {
-            string? token = httpContext.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ")[1];
-            if (token == null)
+            var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+            if (token != null)
             {
-                // check incoming request
-                if (IsEnabledUnauthorizedRoute(httpContext))
-                {
-                    return _next(httpContext);
-                }
-                BaseResponse response = new BaseResponse(StatusCodes.Status401Unauthorized, new MessageDTO("Unauthorized"));
-                httpContext.Response.StatusCode = response.StatusCode;
-                httpContext.Response.ContentType = "application/json";
-                return httpContext.Response.WriteAsJsonAsync(response);
+                AttachUserToContext(context, token);
             }
-            else
-            {
-                if (JwtUtils.ValidateJwtToken(token)){
-                    return _next(httpContext);
-                }
-                else
-                {
-                    BaseResponse response = new BaseResponse(StatusCodes.Status401Unauthorized, new MessageDTO("Unauthorized"));
-                    httpContext.Response.StatusCode = response.StatusCode;
-                    httpContext.Response.ContentType = "application/json";
-                    return httpContext.Response.WriteAsJsonAsync(response);
-                }
-            }
-            //return _next(httpContext);
-            //<summary>
-            //</summary>
+
+            await _next(context);
         }
-        private bool IsEnabledUnauthorizedRoute(HttpContent httpContext)
+
+        private void AttachUserToContext(HttpContext context, string token)
         {
-            bool IsEnabledUnauthorizedRoute = false;
-
-            List<string> enabledRoutes = new List<string>
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"]); // Secret key used for signing the token
+            tokenHandler.ValidateToken(token, new TokenValidationParameters
             {
-                "/api/auth/CreateUser",
-                "/api/auth/LoginUser" ,
-                "/api/auth/GetUser"   ,
-                "/api/notes/GetNotes",
-                "/api/notes/CreateNotes",
-                "/api/notes/UpdateNotes",
-                "/api/notes/DeleteNote",
-            };
-            //if(httpContext.ReadAsStream.Path.Value is not null)
-            //{
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(key),
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ClockSkew = TimeSpan.Zero
+            }, out SecurityToken validatedToken);
 
-            //}
-            return IsEnabledUnauthorizedRoute;
+            var jwtToken = (JwtSecurityToken)validatedToken;
+            var userId = jwtToken.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value;
+
+            // Attach the user ID to the current context
+            context.Items["UserId"] = int.Parse(userId);
         }
     }
 
-    // Extension method used to add the middleware to the HTTP request pipeline.
     public static class JwtMiddlewareExtensions
     {
         public static IApplicationBuilder UseJwtMiddleware(this IApplicationBuilder builder)
