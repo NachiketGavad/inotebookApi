@@ -149,16 +149,43 @@ namespace inotebookApi.Controllers
         //[Authorize]
         public async Task<IActionResult> DeleteNote(int id)
         {
-            var note = await _context.Notes.FindAsync(id);
-            if (note == null)
+            // Get the JWT token from the request headers
+            var token = HttpContext.Request.Headers["auth_token"].FirstOrDefault()?.Split(" ").Last();
+
+            //var userId = 10;
+
+            // Check if the token is missing or invalid
+            if (token == null)
             {
-                return NotFound();
+                return StatusCode(500, new { success = false, error = "Authorization token missing" });
             }
 
-            _context.Notes.Remove(note);
-            await _context.SaveChangesAsync();
+            try
+            {
+                // Validate and decode the JWT token
+                var claimsPrincipal = _jwtUtils.ValidateJwtToken(token); // Implement this method to validate and decode the JWT token
 
-            return NoContent();
+                // Extract the user's ID from the claims
+                var userIdClaim = claimsPrincipal.FindFirst(ClaimTypes.NameIdentifier);
+                if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return StatusCode(500, new { success = false, error = "Invalid or missing user ID claim" });
+                }
+
+                var note = await _context.Notes.FindAsync(id);
+                if (note == null)
+                {
+                    return NotFound();
+                }
+
+                _context.Notes.Remove(note);
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, error = ex.Message });
+            }
         }
 
         private bool NoteExists(int id)
