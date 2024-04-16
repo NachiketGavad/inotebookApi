@@ -28,7 +28,8 @@ namespace inotebookApi.Controllers
 
             if (userId == null)
             {
-                return Unauthorized();
+                //return Unauthorized();
+                return StatusCode(500, new { success = false, error = "Not Authorised" });
             }
 
             // Fetch notes for the authenticated user
@@ -36,11 +37,12 @@ namespace inotebookApi.Controllers
                 .Where(n => n.UserId == userId)
                 .ToListAsync();
 
-            return Ok(notes);
+            //return Ok(notes);
+            return Ok(new { success = true, notes = notes });
         }
 
         [HttpPost("CreateNote")]
-        [Authorize] // Ensure only authenticated users can create notes
+        //[Authorize] // Ensure only authenticated users can create notes
         public async Task<IActionResult> CreateNote(Note note)
         {
             if (!ModelState.IsValid)
@@ -58,7 +60,7 @@ namespace inotebookApi.Controllers
         }
 
         [HttpPut("UpdateNote/{id}")]
-        [Authorize] // Ensure only authenticated users can update notes
+        //[Authorize] // Ensure only authenticated users can update notes
         public async Task<IActionResult> UpdateNote(int id, Note note)
         {
             if (id != note._id)
@@ -88,7 +90,7 @@ namespace inotebookApi.Controllers
         }
 
         [HttpDelete("DeleteNote/{id}")]
-        [Authorize]
+        //[Authorize]
         public async Task<IActionResult> DeleteNote(int id)
         {
             var note = await _context.Notes.FindAsync(id);
