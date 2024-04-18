@@ -14,7 +14,7 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DeployConnection")));
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 
 // allow requests from your React application's origin.
@@ -23,11 +23,12 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp",
         builder =>
         {
-            builder.WithOrigins("http://localhost:3000")
+            builder.WithOrigins("http://localhost:3000", "https://inotebookng.netlify.app")
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
 });
+
 
 builder.Services.AddSingleton<JwtUtils>();
 
